@@ -82,12 +82,14 @@ phase.
 
 ## 6. Project Structure
 
-The cleaned Phase 1 structure of this repository:
+The current Phase 2 structure of this repository:
 
 ```
 .
 ├── src/
 │   ├── components/
+│   │   ├── CalculatorDisplay.vue
+│   │   └── CalculatorKeypad.vue
 │   ├── services/
 │   ├── App.vue
 │   ├── main.js
@@ -104,9 +106,17 @@ The cleaned Phase 1 structure of this repository:
 
 Notes:
 
-- `src/components/` and `src/services/` are reserved directories for
-  future Vue components and backend HTTP service modules.
-- `src/assets/` and demo Vite content have been removed.
+- `CalculatorDisplay.vue` is a presentational component that renders
+  the current expression. It is display-only — input is handled by
+  the keypad buttons and supported keyboard keys.
+- `CalculatorKeypad.vue` is a presentational component that renders
+  the calculator button grid and emits intent events (`append`,
+  `clear`, `backspace`, `calculate`). It performs no string
+  mutation itself.
+- `App.vue` owns the expression state and wires keypad/keyboard
+  input to that state.
+- `src/services/` is still reserved for the future backend API
+  client (Phase 3+).
 
 ---
 
@@ -227,38 +237,62 @@ yet implemented** in this Phase 1 repository.
 
 ## 13. Current Implementation Status
 
-This repository is currently at **Phase 1**: project foundation,
-cleanup, documentation, configuration, and build verification.
+This repository is currently at **Phase 2**: calculator UI and
+expression input. The frontend constructs an expression string and
+displays it; it does not compute a result.
 
-Implemented in Phase 1:
+Implemented in Phase 1 (still present):
 
 - Vue 3 + Vite project foundation.
-- Removal of default Vite demo content.
-- Cleaned project structure with reserved `src/components/` and
-  `src/services/` directories.
-- Minimal application shell displaying the project title and a
-  status message.
-- Clean global stylesheet (plain CSS).
+- Removed default Vite demo content (including `public/favicon.svg`).
+- Cleaned project structure.
+- Plain-CSS global stylesheet.
 - `.env.example` for backend base URL configuration.
 - Updated `.gitignore`.
 - `codestyle.md` documenting coding conventions.
 - This `README.md`.
 
+Implemented in Phase 2:
+
+- Calculator interface (`CalculatorKeypad.vue`, `CalculatorDisplay.vue`).
+- Calculator display that shows the current expression (with `0`
+  shown as an empty-state placeholder).
+- Calculator keypad containing digits `0`–`9`, decimal point,
+  operators `+ - * /`, parentheses `( )`, `C` (clear), `⌫`
+  (backspace), and `=` (placeholder action).
+- Expression string construction — pressing buttons or supported
+  keyboard keys appends the corresponding character to the
+  expression.
+- Clear (`C`) behavior — empties the expression.
+- Backspace (`⌫`) behavior — removes only the last character of the
+  expression (string operation only, no parsing).
+- Supported keyboard entry — `0`–`9`, `.`, `+`, `-`, `*`, `/`, `(`,
+  `)`, `Backspace`, `Delete` / `Escape`, and `Enter` / `=`.
+  Unsupported printable keys are ignored and do not modify the
+  expression.
+- Responsive calculator layout for desktop, tablet, and mobile
+  widths.
+- Accessible semantic markup, including visible focus states and
+  appropriate `aria-label`s on icon-like buttons.
+
+The `=` button is **not yet wired to any calculation**. In Phase 2
+it is a visual placeholder whose handler is intentionally a no-op;
+the expression is never replaced by a result and the browser
+performs no network request.
+
 Not yet implemented (planned for later phases):
 
-- Calculator keypad UI.
-- Expression input behavior and calculate button behavior.
-- Keyboard calculator controls.
+- Backend calculation integration (`POST /api/calculate`).
+- Display of a calculated result returned by the backend.
 - `src/services/` API client implementation.
-- Integration with `POST /api/calculate`.
 - Integration with `GET /api/history`.
-- Integration with `DELETE /api/history/{id}`.
 - History display panel.
+- Integration with `DELETE /api/history/{id}`.
 - History deletion UI.
 - Loading indicators and error-state UI for backend requests.
 
-The frontend never performs arithmetic locally; all of the above
-will be implemented by delegating to the backend API.
+The frontend never performs arithmetic locally; all numeric
+evaluation belongs to the backend.
 
 ---
 

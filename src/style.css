@@ -26,35 +26,153 @@ body {
   padding: 24px;
 }
 
-.app-shell {
+.calculator {
   width: 100%;
-  max-width: 480px;
-  padding: 32px 24px;
+  max-width: 360px;
+  padding: 20px;
   background: #ffffff;
   border: 1px solid #d0d7de;
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(31, 35, 40, 0.06);
+}
+
+.calculator__title {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #57606a;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.calculator__hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #6e7781;
   text-align: center;
 }
 
-.app-title {
-  margin: 0 0 12px;
-  font-size: 28px;
-  font-weight: 600;
-  color: #1f2328;
+.display {
+  background: #1f2328;
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
-.app-status {
-  margin: 0;
+.display__value {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 28px;
+  font-weight: 500;
+  color: #f6f8fa;
+  text-align: right;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  min-height: 1em;
+}
+
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.keypad__button {
+  appearance: none;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #f6f8fa;
+  color: #1f2328;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 500;
+  height: 56px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease,
+    box-shadow 0.12s ease;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.keypad__button:hover {
+  background: #eaeef2;
+}
+
+.keypad__button:active {
+  background: #d8dee4;
+}
+
+.keypad__button:focus-visible {
+  outline: 2px solid #0969da;
+  outline-offset: 2px;
+}
+
+.keypad__button--operator {
+  background: #ddf4ff;
+  border-color: #b6e3ff;
+  color: #0969da;
+  font-weight: 600;
+}
+
+.keypad__button--operator:hover {
+  background: #b6e3ff;
+}
+
+.keypad__button--equals {
+  background: #2da44e;
+  border-color: #2c974b;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.keypad__button--equals:hover {
+  background: #2c974b;
+}
+
+.keypad__button--utility {
+  background: #fff8c5;
+  border-color: #d4a72c;
+  color: #57410a;
+  font-weight: 600;
+}
+
+.keypad__button--utility:hover {
+  background: #fae17d;
+}
+
+.keypad__button--paren {
+  background: #f6f8fa;
   color: #57606a;
-  font-size: 16px;
 }
 
 @media (max-width: 480px) {
-  .app-shell {
-    padding: 24px 16px;
+  .calculator {
+    padding: 16px;
   }
 
-  .app-title {
+  .display {
+    padding: 14px 14px;
+    min-height: 64px;
+  }
+
+  .display__value {
     font-size: 24px;
+  }
+
+  .keypad__button {
+    height: 52px;
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 360px) {
+  .keypad__button {
+    height: 48px;
+    font-size: 16px;
   }
 }
