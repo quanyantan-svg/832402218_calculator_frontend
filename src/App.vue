@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import CalculatorDisplay from './components/CalculatorDisplay.vue';
 import CalculatorKeypad from './components/CalculatorKeypad.vue';
 import HistoryList from './components/HistoryList.vue';
-import { ApiError, calculateExpression, getHistory } from './services/calculatorApi.js';
+import { ApiError, calculateExpression, deleteHistory, getHistory } from './services/calculatorApi.js';
 
 const expression = ref('');
 const result = ref('');
@@ -13,6 +13,9 @@ const isLoading = ref(false);
 const history = ref([]);
 const isHistoryLoading = ref(false);
 const historyError = ref('');
+
+const deletingHistoryId = ref(null);
+const deleteHistoryError = ref('');
 
 const allowedInputKeys = new Set([
   '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -97,6 +100,37 @@ async function loadHistory() {
   }
 }
 
+async function handleDeleteHistory(historyId) {
+  if (deletingHistoryId.value !== null) {
+    return;
+  }
+
+  deleteHistoryError.value = '';
+  deletingHistoryId.value = historyId;
+
+  let deleted = false;
+
+  try {
+    await deleteHistory(historyId);
+    deleted = true;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      deleteHistoryError.value = err.message;
+    } else {
+      deleteHistoryError.value = 'Unable to delete history record.';
+    }
+  } finally {
+    deletingHistoryId.value = null;
+  }
+
+  if (deleted) {
+    // Authoritative refresh: the rendered list after a successful
+    // delete must come from GET /api/history, not from a local
+    // filter, so the database ownership is observable.
+    await loadHistory();
+  }
+}
+
 function handleKeydown(event) {
   if (isLoading.value) {
     return;
@@ -169,6 +203,9 @@ onUnmounted(() => {
       :history="history"
       :is-loading="isHistoryLoading"
       :error-message="historyError"
+      :deleting-id="deletingHistoryId"
+      :delete-error="deleteHistoryError"
+      @delete="handleDeleteHistory"
     />
   </main>
 </template>

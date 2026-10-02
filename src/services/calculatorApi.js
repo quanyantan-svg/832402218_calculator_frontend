@@ -119,3 +119,49 @@ export async function getHistory() {
 
   return payload.history;
 }
+
+export async function deleteHistory(historyId) {
+  if (typeof historyId !== 'number' || !Number.isInteger(historyId) || historyId <= 0) {
+    throw new ApiError(
+      'History record not found.',
+      404,
+    );
+  }
+
+  const url = `${resolveBaseUrl()}${HISTORY_PATH}/${historyId}`;
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+  } catch (networkError) {
+    throw new ApiError(
+      'Unable to delete history record.',
+      0,
+    );
+  }
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch (parseError) {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    throw new ApiError(readMessage(payload), response.status);
+  }
+
+  if (!payload || typeof payload !== 'object' || payload.success !== true) {
+    throw new ApiError(
+      'Calculator service returned an unexpected response.',
+      response.status,
+    );
+  }
+
+  return typeof payload.message === 'string' ? payload.message : '';
+}

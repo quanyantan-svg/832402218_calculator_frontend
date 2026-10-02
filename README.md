@@ -29,13 +29,14 @@ backend over HTTP using the native `fetch` API. Calculation logic,
 database operations, and persistence live exclusively in the
 backend repository.
 
-> Note: Frontend-backend HTTP integration for calculations and
-> history retrieval is **implemented** — the current code sends
-> `POST /api/calculate` for evaluation and `GET /api/history` for
-> history. The backend / database is the source of truth for
-> history. History **deletion** (`DELETE /api/history/{id}`) is
-> **not yet implemented** — see *Current Implementation Status*
-> below.
+> Note: Frontend-backend HTTP integration for calculations, history
+> retrieval, and individual history record deletion is
+> **implemented** — the current code sends `POST /api/calculate`
+> for evaluation, `GET /api/history` for history, and `DELETE
+> /api/history/{id}` for deletion. The backend / database is the
+> source of truth for history. Clear-all and batch deletion are
+> **not** part of the backend API and are intentionally not
+> implemented in the frontend.
 
 ---
 
@@ -154,11 +155,13 @@ are reported because they are the versions actually used to build
 and run the current commit.
 
 A running instance of the backend service (`832402218_calculator_backend`)
-**is** required by the current Phase 4 application, both for
-evaluating expressions through `POST /api/calculate` and for
-retrieving calculation history through `GET /api/history`. Without
-the backend, the calculator UI itself still loads and the user can
-still construct, edit, and clear an expression, but:
+**is** required by the current Phase 5 application, both for
+evaluating expressions through `POST /api/calculate`, for
+retrieving calculation history through `GET /api/history`, and for
+deleting individual history records through
+`DELETE /api/history/{id}`. Without the backend, the calculator UI
+itself still loads and the user can still construct, edit, and
+clear an expression, but:
 
 - pressing `=` does **not** produce a new valid calculation result
   (the frontend shows the generic *"Unable to connect to the
@@ -166,6 +169,10 @@ still construct, edit, and clear an expression, but:
   evaluation);
 - calculation history cannot be retrieved or refreshed (the history
   panel shows *"Unable to load calculation history."*);
+- clicking Delete on a history record does **not** remove it; the
+  history panel shows *"Unable to delete history record."* (or the
+  backend's safe `message`, e.g. *"History record not found"*), and
+  the row stays visible until an authoritative refresh succeeds;
 - no local fallback calculation is performed and no browser-stored
   history (LocalStorage, sessionStorage, IndexedDB) is used.
 
@@ -267,14 +274,18 @@ service returns the controlled error
 *"Calculator service URL is not configured. Set VITE_API_BASE_URL in
 a local .env file."* and no request is issued.
 
-The current Phase 4 integration calls:
+The current Phase 5 integration calls:
 
 - `POST http://127.0.0.1:8000/api/calculate` with a JSON body of
   `{"expression": "<expression string>"}`. The backend's `result`
   string is displayed verbatim on success.
-- `GET http://127.0.0.1:8000/api/history` once on initial page load
-  and again after every successful calculation. The response is
-  rendered newest-first in the history panel.
+- `GET http://127.0.0.1:8000/api/history` once on initial page
+  load, after every successful calculation, and after every
+  successful history record deletion. The response is rendered
+  newest-first in the history panel.
+- `DELETE http://127.0.0.1:8000/api/history/{history_id}` when the
+  user clicks a record's Delete button. The id sent is the
+  backend's `record.id` from `GET /api/history`.
 
 When the backend is stopped or unreachable:
 
@@ -285,18 +296,25 @@ When the backend is stopped or unreachable:
   history."* (or the backend's safe `message` when available) in
   the history panel. A previously rendered history list is
   preserved during a refresh failure.
+- `DELETE /api/history/{id}` failures show *"Unable to delete
+  history record."* (or the backend's safe `message`, such as
+  *"History record not found"* for `HTTP 404`) in the history
+  area. The row remains visible until an authoritative refresh
+  removes it.
 
 LocalStorage, sessionStorage, and IndexedDB are not used. History
-shown in the UI always comes from `GET /api/history`.
+shown in the UI always comes from `GET /api/history`, and history
+deletions are confirmed by the backend before the UI updates.
 
 ---
 
 ## 13. Current Implementation Status
 
-This repository is currently at **Phase 4**: calculation requests
-via `POST /api/calculate` plus history retrieval and display via
-`GET /api/history`. The frontend does not persist history in the
-browser; the backend / database is authoritative.
+This repository is currently at **Phase 5**: calculation requests
+via `POST /api/calculate`, history retrieval and display via
+`GET /api/history`, and individual history record deletion via
+`DELETE /api/history/{id}`. The frontend does not persist history
+in the browser; the backend / database is authoritative.
 
 Implemented in Phase 1 (still present):
 
@@ -373,18 +391,74 @@ Implemented in Phase 4:
   calculation. LocalStorage, sessionStorage, and IndexedDB are not
   used.
 
+Implemented in Phase 5:
+
+- `deleteHistory(historyId)` exported from `src/services/calculatorApi.js` —
+  issues `DELETE /api/history/{historyId}` against the same base
+  URL as the other endpoints, using the existing `ApiError` model.
+  Network failures throw `ApiError("Unable to delete history
+  record.", 0)`; HTTP 4xx / 5xx responses throw `ApiError(...)` with
+  the backend's safe `message` (so `HTTP 404` surfaces
+  *"History record not found"*); malformed responses throw a
+  controlled fallback `ApiError`. Success requires the JSON body to
+  contain `success: true`. The id passed in must come from a record
+  returned by `GET /api/history` — the frontend does not derive ids
+  from array position, expression text, timestamp, or result.
+- Per-record Delete button in `HistoryList.vue` — each record
+  renders a `<button type="button">Delete</button>` with a
+  descriptive `aria-label` that includes the record's expression.
+  The button is disabled while any other deletion is in flight.
+  The button text temporarily switches to *"Deleting…"* for the
+  active row. No `fetch` or storage logic is added to the
+  component — it remains presentational and only emits `delete`
+  with the record id.
+- Deletion state in `App.vue` — `deletingHistoryId` (number or
+  `null`) tracks which record is currently being deleted;
+  `deleteHistoryError` holds the controlled error message. These
+  states are deliberately separate from the existing
+  `isLoading` / `isHistoryLoading` / calculation / history-error
+  state so that a deletion cannot be confused with a calculation
+  or a history refresh.
+- Authoritative refresh after deletion — after `deleteHistory()`
+  resolves successfully, `App.vue` calls `loadHistory()` and
+  replaces the displayed history with the backend's response. The
+  frontend does **not** locally filter the history array as the
+  authoritative mechanism for hiding a deleted row; the final
+  rendered list comes from `GET /api/history` so the database
+  ownership is observable.
+- 404 / not-found handling — when the backend returns
+  `HTTP 404`, the frontend surfaces the backend's
+  *"History record not found"* message in the history area. The
+  row remains visible until a subsequent authoritative refresh
+  removes it.
+- Backend-offline delete — when the backend is unreachable the
+  frontend shows *"Unable to delete history record."* in the
+  history area; the existing list stays intact and the calculator
+  remains usable.
+- DELETE-success / GET-refresh-failure separation — if `DELETE
+  /api/history/{id}` succeeds but the subsequent `loadHistory()`
+  fails, the deletion is still treated as successful; the
+  refresh-failure error flows into `historyError` only and does
+  not overwrite `deleteHistoryError` or the calculation result.
+- Persistence — because deletion is performed by the backend
+  against MySQL, deleted records do not return after a browser
+  refresh, frontend dev-server restart, or backend process
+  restart.
+
 The frontend still does not perform arithmetic locally. Every
 calculation result displayed in the UI comes from a successful
-response of `POST /api/calculate`, and every rendered history
-record comes from `GET /api/history`.
+response of `POST /api/calculate`, every rendered history record
+comes from `GET /api/history`, and every successful deletion is
+confirmed by the backend before the UI updates.
 
-Not yet implemented (planned for later phases):
+Not implemented in Phase 5 (and intentionally out of scope):
 
-- Integration with `DELETE /api/history/{id}`.
-- History deletion UI (delete buttons, confirmation dialogs,
-  optimistic deletion).
-- LocalStorage is still **not** used as a source of truth for any
-  history data.
+- Clear-all history.
+- Batch / multi-select deletion.
+- Optimistic local deletion that hides a row before backend
+  confirmation.
+- LocalStorage, sessionStorage, or IndexedDB usage for history
+  state.
 
 ---
 
@@ -434,10 +508,20 @@ Expected results:
     records persisted by the backend reload correctly.
   - Restarting the frontend dev server does not affect persisted
     history (the backend's MySQL store is authoritative).
-- Browser Network panel shows a real `POST http://127.0.0.1:8000/api/calculate`
-  request with a JSON body of `{"expression": "<expression>"}`,
-  followed by a real `GET http://127.0.0.1:8000/api/history`
-  request.
+- Delete verification (Phase 5):
+  - Each visible history record shows a Delete button.
+  - Clicking Delete sends `DELETE http://127.0.0.1:8000/api/history/{id}`
+    with the id taken from the backend's `record.id`.
+  - On `HTTP 200` the row disappears from the history panel after
+    the subsequent `GET /api/history` returns the updated list;
+    surrounding rows are unchanged.
+  - On `HTTP 404` the backend's *"History record not found"*
+    message is displayed in the history area; the row stays
+    visible.
+  - When the backend is offline, clicking Delete shows
+    *"Unable to delete history record."* and the row stays visible.
+  - Refreshing the browser page after a deletion does not restore
+    the deleted record.
 - Manual UI / input verification:
   - Button input constructs the expression string.
   - Keyboard input (digits, operators, parentheses, decimal point)
