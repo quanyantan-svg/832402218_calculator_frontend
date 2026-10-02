@@ -1,6 +1,13 @@
 <script setup>
 const emit = defineEmits(['append', 'clear', 'backspace', 'calculate']);
 
+defineProps({
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
+});
+
 const buttons = [
   { id: 'clear', label: 'C', ariaLabel: 'Clear expression', emit: 'clear', variant: 'utility' },
   { id: 'backspace', label: '⌫', ariaLabel: 'Backspace', emit: 'backspace', variant: 'utility' },
@@ -43,6 +50,7 @@ function onClick(button) {
       :class="['keypad__button--' + button.variant]"
       :aria-label="button.ariaLabel"
       :data-key="button.id"
+      :disabled="disabled"
       @click="onClick(button)"
     >
       {{ button.label }}

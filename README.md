@@ -85,7 +85,7 @@ phase.
 
 ## 6. Project Structure
 
-The current Phase 2 structure of this repository:
+The current Phase 3 structure of this repository:
 
 ```
 .
@@ -94,6 +94,7 @@ The current Phase 2 structure of this repository:
 │   │   ├── CalculatorDisplay.vue
 │   │   └── CalculatorKeypad.vue
 │   ├── services/
+│   │   └── calculatorApi.js
 │   ├── App.vue
 │   ├── main.js
 │   └── style.css
@@ -110,16 +111,21 @@ The current Phase 2 structure of this repository:
 Notes:
 
 - `CalculatorDisplay.vue` is a presentational component that renders
-  the current expression. It is display-only — input is handled by
-  the keypad buttons and supported keyboard keys.
+  the current expression, the backend result, an error message, or a
+  loading indicator. It does not perform any network or string
+  mutation.
 - `CalculatorKeypad.vue` is a presentational component that renders
   the calculator button grid and emits intent events (`append`,
-  `clear`, `backspace`, `calculate`). It performs no string
-  mutation itself.
-- `App.vue` owns the expression state and wires keypad/keyboard
-  input to that state.
-- `src/services/` is still reserved for the future backend API
-  client (Phase 3+).
+  `clear`, `backspace`, `calculate`). It performs no string mutation
+  or network logic itself. It accepts a `disabled` prop used while a
+  calculation request is in flight.
+- `src/services/calculatorApi.js` owns all HTTP communication with
+  the backend. It exposes `calculateExpression(expression)` and an
+  `ApiError` class. Components must not contain duplicated `fetch`
+  logic.
+- `App.vue` owns the calculator UI state (`expression`, `result`,
+  `errorMessage`, `isLoading`) and wires keypad / keyboard input to
+  that state.
 
 ---
 
@@ -233,18 +239,32 @@ http://127.0.0.1:8000
 This corresponds to the default FastAPI development server in the
 backend repository.
 
-API integration is planned for a later frontend phase (Phase 3) and
-is **not yet implemented** in this repository. The current code
-implements the calculator UI and expression input only; it does not
-yet call any backend endpoint.
+The frontend reads this URL from the `VITE_API_BASE_URL`
+environment variable (defined in `.env.example`). The frontend must
+be running with this variable set; otherwise the calculator
+service returns the controlled error
+*"Calculator service URL is not configured. Set VITE_API_BASE_URL in
+a local .env file."* and no request is issued.
+
+The Phase 3 integration calls:
+
+- `POST http://127.0.0.1:8000/api/calculate`
+
+with a JSON body of `{"expression": "<expression string>"}` and
+displays the backend's `result` string verbatim on success.
+
+When the backend is stopped or unreachable, the frontend shows the
+generic message *"Unable to connect to the calculator service."* and
+does **not** produce any local fallback result.
 
 ---
 
 ## 13. Current Implementation Status
 
-This repository is currently at **Phase 2**: calculator UI and
-expression input. The frontend constructs an expression string and
-displays it; it does not compute a result.
+This repository is currently at **Phase 3**: integration with the
+backend `POST /api/calculate` endpoint. The frontend constructs an
+expression, sends it to the backend, and displays the backend result
+or the backend's safe error message.
 
 Implemented in Phase 1 (still present):
 
@@ -264,7 +284,7 @@ Implemented in Phase 2:
   shown as an empty-state placeholder).
 - Calculator keypad containing digits `0`–`9`, decimal point,
   operators `+ - * /`, parentheses `( )`, `C` (clear), `⌫`
-  (backspace), and `=` (placeholder action).
+  (backspace), and `=`.
 - Expression string construction — pressing buttons or supported
   keyboard keys appends the corresponding character to the
   expression.
@@ -280,24 +300,46 @@ Implemented in Phase 2:
 - Accessible semantic markup, including visible focus states and
   appropriate `aria-label`s on icon-like buttons.
 
-The `=` button is **not yet wired to any calculation**. In Phase 2
-it is a visual placeholder whose handler is intentionally a no-op;
-the expression is never replaced by a result and the browser
-performs no network request.
+Implemented in Phase 3:
+
+- `src/services/calculatorApi.js` — backend HTTP client that owns
+  the `POST /api/calculate` request, base-URL normalization, JSON
+  parsing, and error mapping. Components do not contain duplicated
+  `fetch` logic.
+- Real `=` behavior — pressing `=` (button or `Enter`) sends the
+  current expression to the backend and renders the returned
+  result.
+- Backend result display — the calculator display shows the
+  backend's `result` string verbatim, prefixed with `=`.
+- Backend error display — division-by-zero, malformed expressions,
+  and other backend `HTTP 400` / `HTTP 500` responses are shown as
+  the backend's safe `message` text.
+- Connection-failure handling — when the backend is unreachable the
+  frontend shows a generic "Unable to connect to the calculator
+  service." message and does not produce any local fallback result.
+- Loading state — while a request is in flight, the entire keypad
+  is disabled, the display shows "Calculating…", and keyboard
+  input that would mutate or resubmit is ignored.
+- Duplicate-request protection — a second `=` press while a
+  request is in flight is ignored.
+- Result-reset on edit — appending, backspacing, or clearing the
+  expression clears any previous result and error so stale values
+  from a previous expression do not linger.
+- `ApiError` exception type with `message` and `status` fields is
+  used for both HTTP and network errors.
+
+The frontend still does not perform arithmetic locally. Every
+calculation result displayed in the UI comes from a successful
+response of `POST /api/calculate`.
 
 Not yet implemented (planned for later phases):
 
-- Backend calculation integration (`POST /api/calculate`).
-- Display of a calculated result returned by the backend.
-- `src/services/` API client implementation.
 - Integration with `GET /api/history`.
 - History display panel.
 - Integration with `DELETE /api/history/{id}`.
 - History deletion UI.
-- Loading indicators and error-state UI for backend requests.
-
-The frontend never performs arithmetic locally; all numeric
-evaluation belongs to the backend.
+- LocalStorage is still **not** used as a source of truth for any
+  history data.
 
 ---
 
@@ -323,19 +365,38 @@ Expected results:
   - The expression display visible (showing `0` in the empty state).
   - The keypad visible with digit, operator, parenthesis, decimal,
     clear, backspace, and `=` buttons.
+- Backend integration verification (with the backend running on
+  `http://127.0.0.1:8000`):
+  - `1+2` → result `3`.
+  - `(1+2)*3` → result `9`.
+  - `10-3-2` → result `5`.
+  - `8/4/2` → result `1`.
+  - `0.1+0.2` → result `0.3`.
+  - `.5*2` → result `1`.
+  - `5.` → result `5`.
+  - `-(1+2)` → result `-3`.
+  - `--5` → result `5`.
+  - `1/0` → backend error displayed ("division by zero" or similar).
+  - Malformed expressions that can be constructed through the UI
+    (e.g. `1++*`, `((1+`) → backend error displayed.
+- Browser Network panel shows a real `POST http://127.0.0.1:8000/api/calculate`
+  request with a JSON body of `{"expression": "<expression>"}`.
 - Manual UI / input verification:
-  - Button input constructs the expression string (e.g. pressing
-    `1 + 2` produces `1+2`; pressing `( 1 + 2 ) * 3` produces
-    `(1+2)*3`; pressing `0 . 5 + 2` produces `0.5+2`).
+  - Button input constructs the expression string.
   - Keyboard input (digits, operators, parentheses, decimal point)
     constructs the expression string the same way.
   - `C` clears the expression; the display returns to `0`.
   - `Backspace` removes exactly one character from the expression.
-  - Pressing `=` does **not** calculate the expression locally and
-    does **not** modify the expression string.
-  - Pressing `=` makes **no** network request.
-- No API requests are issued in Phase 2. The browser's network
-  panel remains empty of frontend-originated traffic.
+  - While a calculation request is in flight, the entire keypad is
+    disabled and the display shows "Calculating…".
+  - Editing the expression after a successful calculation clears
+    the previous result and any previous error.
+- Backend-offline verification (after stopping the backend):
+  - Pressing `=` with `1+2` produces no `3`.
+  - The generic "Unable to connect to the calculator service."
+    message is shown.
+  - The application remains usable — the user can edit and clear
+    the expression and retry once the backend is back.
 - The browser console reports no errors, no Vue warnings, and no
   missing-asset errors.
 

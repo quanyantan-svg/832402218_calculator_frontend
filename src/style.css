@@ -57,14 +57,14 @@ body {
   border-radius: 8px;
   padding: 16px 18px;
   margin-bottom: 16px;
-  min-height: 72px;
+  min-height: 96px;
   display: flex;
-  align-items: center;
-  overflow-x: auto;
-  overflow-y: hidden;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
 }
 
-.display__value {
+.display__expression {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 28px;
@@ -72,8 +72,33 @@ body {
   color: #f6f8fa;
   text-align: right;
   white-space: nowrap;
+  overflow-x: auto;
   letter-spacing: 0.02em;
-  min-height: 1em;
+}
+
+.display__result {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 500;
+  color: #6e7781;
+  text-align: right;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.display__loading {
+  font-size: 14px;
+  color: #9ca3af;
+  text-align: right;
+  font-style: italic;
+}
+
+.display__error {
+  font-size: 14px;
+  color: #ff8182;
+  text-align: right;
+  word-break: break-word;
 }
 
 .keypad {
@@ -94,22 +119,27 @@ body {
   height: 56px;
   cursor: pointer;
   transition: background-color 0.12s ease, border-color 0.12s ease,
-    box-shadow 0.12s ease;
+    box-shadow 0.12s ease, opacity 0.12s ease;
   touch-action: manipulation;
   user-select: none;
 }
 
-.keypad__button:hover {
+.keypad__button:hover:not(:disabled) {
   background: #eaeef2;
 }
 
-.keypad__button:active {
+.keypad__button:active:not(:disabled) {
   background: #d8dee4;
 }
 
 .keypad__button:focus-visible {
   outline: 2px solid #0969da;
   outline-offset: 2px;
+}
+
+.keypad__button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .keypad__button--operator {
@@ -119,7 +149,7 @@ body {
   font-weight: 600;
 }
 
-.keypad__button--operator:hover {
+.keypad__button--operator:hover:not(:disabled) {
   background: #b6e3ff;
 }
 
@@ -130,7 +160,7 @@ body {
   font-weight: 700;
 }
 
-.keypad__button--equals:hover {
+.keypad__button--equals:hover:not(:disabled) {
   background: #2c974b;
 }
 
@@ -141,7 +171,7 @@ body {
   font-weight: 600;
 }
 
-.keypad__button--utility:hover {
+.keypad__button--utility:hover:not(:disabled) {
   background: #fae17d;
 }
 
@@ -157,11 +187,15 @@ body {
 
   .display {
     padding: 14px 14px;
-    min-height: 64px;
+    min-height: 88px;
   }
 
-  .display__value {
+  .display__expression {
     font-size: 24px;
+  }
+
+  .display__result {
+    font-size: 16px;
   }
 
   .keypad__button {

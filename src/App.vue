@@ -2,34 +2,74 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import CalculatorDisplay from './components/CalculatorDisplay.vue';
 import CalculatorKeypad from './components/CalculatorKeypad.vue';
+import { ApiError, calculateExpression } from './services/calculatorApi.js';
 
 const expression = ref('');
+const result = ref('');
+const errorMessage = ref('');
+const isLoading = ref(false);
 
 const allowedInputKeys = new Set([
   '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
   '.', '+', '-', '*', '/', '(', ')',
 ]);
 
+function clearResultAndError() {
+  result.value = '';
+  errorMessage.value = '';
+}
+
 function handleAppend(token) {
   expression.value += token;
+  clearResultAndError();
 }
 
 function handleClear() {
   expression.value = '';
+  clearResultAndError();
 }
 
 function handleBackspace() {
   expression.value = expression.value.slice(0, -1);
+  clearResultAndError();
 }
 
-// Placeholder for Phase 2. Phase 3 will wire this to POST /api/calculate
-// and render the returned result. Local evaluation is intentionally
-// forbidden.
-function handleCalculate() {
-  // no-op: backend integration arrives in a later phase
+async function handleCalculate() {
+  if (isLoading.value) {
+    return;
+  }
+
+  const currentExpression = expression.value;
+
+  if (currentExpression.length === 0) {
+    errorMessage.value = 'Enter an expression.';
+    result.value = '';
+    return;
+  }
+
+  errorMessage.value = '';
+  isLoading.value = true;
+
+  try {
+    const data = await calculateExpression(currentExpression);
+    result.value = data.result;
+    errorMessage.value = '';
+  } catch (err) {
+    if (err instanceof ApiError) {
+      errorMessage.value = err.message;
+    } else {
+      errorMessage.value = 'Unable to connect to the calculator service.';
+    }
+    result.value = '';
+  } finally {
+    isLoading.value = false;
+  }
 }
 
 function handleKeydown(event) {
+  if (isLoading.value) {
+    return;
+  }
   if (event.ctrlKey || event.altKey || event.metaKey) {
     return;
   }
@@ -74,16 +114,21 @@ onUnmounted(() => {
 <template>
   <main class="calculator" aria-label="Calculator">
     <h1 class="calculator__title">Calculator</h1>
-    <CalculatorDisplay :expression="expression" />
+    <CalculatorDisplay
+      :expression="expression"
+      :result="result"
+      :error-message="errorMessage"
+      :is-loading="isLoading"
+    />
     <CalculatorKeypad
+      :disabled="isLoading"
       @append="handleAppend"
       @clear="handleClear"
       @backspace="handleBackspace"
       @calculate="handleCalculate"
     />
     <p class="calculator__hint" aria-hidden="true">
-      Build an expression. The “=” button is reserved for backend
-      evaluation in a later phase.
+      Press “=” or Enter to evaluate via the backend.
     </p>
   </main>
 </template>
