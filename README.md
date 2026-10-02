@@ -86,8 +86,6 @@ The cleaned Phase 1 structure of this repository:
 
 ```
 .
-├── public/
-│   └── favicon.svg
 ├── src/
 │   ├── components/
 │   ├── services/
