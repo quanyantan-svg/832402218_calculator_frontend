@@ -88,7 +88,7 @@ phase.
 
 ## 6. Project Structure
 
-The current Phase 4 structure of this repository:
+The current Phase 5 structure of this repository:
 
 ```
 .
@@ -125,17 +125,27 @@ Notes:
   calculation request is in flight.
 - `HistoryList.vue` is a presentational component that renders the
   calculator history returned by the backend. It receives `history`,
-  `isLoading`, and `errorMessage` as props. It performs no network
-  requests and does not store history in any browser storage.
+  `isLoading`, `errorMessage`, `deletingId`, and `deleteError` as
+  props, and emits a single `delete` event carrying the selected
+  backend record id. It performs no `fetch` calls, imports no
+  service module, does not use any browser storage, and does not
+  mutate the `history` array itself.
 - `src/services/calculatorApi.js` owns all HTTP communication with
   the backend. It exposes `calculateExpression(expression)`,
-  `getHistory()`, and an `ApiError` class. Components must not
-  contain duplicated `fetch` logic.
-- `App.vue` owns the calculator UI state (`expression`, `result`,
-  `errorMessage`, `isLoading`) and the history state (`history`,
-  `isHistoryLoading`, `historyError`). It wires keypad / keyboard
-  input to the calculator state and orchestrates initial history
-  load plus history refresh after a successful calculation.
+  `getHistory()`, `deleteHistory(historyId)`, and an `ApiError`
+  class. The service is the sole owner of HTTP traffic; components
+  must not contain duplicated `fetch` logic.
+- `App.vue` owns the calculator UI state, history state, and
+  deletion state. The calculator state holds `expression`,
+  `result`, `errorMessage`, and `isLoading`. The history state holds
+  `history`, `isHistoryLoading`, and `historyError`. The deletion
+  state holds `deletingHistoryId` and `deleteHistoryError`. It
+  wires keypad / keyboard input to the calculator state and
+  orchestrates: the initial `GET /api/history` on mount, the
+  `POST /api/calculate` request, the `GET /api/history` refresh
+  after a successful calculation, the `DELETE /api/history/{id}`
+  request for a selected record, and the authoritative `GET
+  /api/history` refresh after a successful deletion.
 
 ---
 
