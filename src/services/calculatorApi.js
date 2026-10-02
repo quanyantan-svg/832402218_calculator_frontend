@@ -10,6 +10,7 @@
  */
 
 const CALCULATE_PATH = '/api/calculate';
+const HISTORY_PATH = '/api/history';
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -78,4 +79,43 @@ export async function calculateExpression(expression) {
     expression: typeof payload.expression === 'string' ? payload.expression : expression,
     result: payload.result,
   };
+}
+
+export async function getHistory() {
+  const url = `${resolveBaseUrl()}${HISTORY_PATH}`;
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+  } catch (networkError) {
+    throw new ApiError(
+      'Unable to load calculation history.',
+      0,
+    );
+  }
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch (parseError) {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    throw new ApiError(readMessage(payload), response.status);
+  }
+
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.history)) {
+    throw new ApiError(
+      'Calculator service returned an unexpected history response.',
+      response.status,
+    );
+  }
+
+  return payload.history;
 }

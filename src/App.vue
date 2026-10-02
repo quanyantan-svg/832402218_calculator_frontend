@@ -2,12 +2,17 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import CalculatorDisplay from './components/CalculatorDisplay.vue';
 import CalculatorKeypad from './components/CalculatorKeypad.vue';
-import { ApiError, calculateExpression } from './services/calculatorApi.js';
+import HistoryList from './components/HistoryList.vue';
+import { ApiError, calculateExpression, getHistory } from './services/calculatorApi.js';
 
 const expression = ref('');
 const result = ref('');
 const errorMessage = ref('');
 const isLoading = ref(false);
+
+const history = ref([]);
+const isHistoryLoading = ref(false);
+const historyError = ref('');
 
 const allowedInputKeys = new Set([
   '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -50,10 +55,13 @@ async function handleCalculate() {
   errorMessage.value = '';
   isLoading.value = true;
 
+  let calculated = false;
+
   try {
     const data = await calculateExpression(currentExpression);
     result.value = data.result;
     errorMessage.value = '';
+    calculated = true;
   } catch (err) {
     if (err instanceof ApiError) {
       errorMessage.value = err.message;
@@ -63,6 +71,29 @@ async function handleCalculate() {
     result.value = '';
   } finally {
     isLoading.value = false;
+  }
+
+  if (calculated) {
+    // A history refresh failure must not overwrite a successful
+    // calculation result. Errors flow into historyError only.
+    await loadHistory();
+  }
+}
+
+async function loadHistory() {
+  isHistoryLoading.value = true;
+  try {
+    const items = await getHistory();
+    history.value = items;
+    historyError.value = '';
+  } catch (err) {
+    if (err instanceof ApiError) {
+      historyError.value = err.message;
+    } else {
+      historyError.value = 'Unable to load calculation history.';
+    }
+  } finally {
+    isHistoryLoading.value = false;
   }
 }
 
@@ -104,6 +135,7 @@ function handleKeydown(event) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown);
+  loadHistory();
 });
 
 onUnmounted(() => {
@@ -112,23 +144,31 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="calculator" aria-label="Calculator">
-    <h1 class="calculator__title">Calculator</h1>
-    <CalculatorDisplay
-      :expression="expression"
-      :result="result"
-      :error-message="errorMessage"
-      :is-loading="isLoading"
+  <main class="app-shell" aria-label="Calculator application">
+    <div class="calculator" aria-label="Calculator">
+      <h1 class="calculator__title">Calculator</h1>
+      <CalculatorDisplay
+        :expression="expression"
+        :result="result"
+        :error-message="errorMessage"
+        :is-loading="isLoading"
+      />
+      <CalculatorKeypad
+        :disabled="isLoading"
+        @append="handleAppend"
+        @clear="handleClear"
+        @backspace="handleBackspace"
+        @calculate="handleCalculate"
+      />
+      <p class="calculator__hint" aria-hidden="true">
+        Press “=” or Enter to evaluate via the backend.
+      </p>
+    </div>
+
+    <HistoryList
+      :history="history"
+      :is-loading="isHistoryLoading"
+      :error-message="historyError"
     />
-    <CalculatorKeypad
-      :disabled="isLoading"
-      @append="handleAppend"
-      @clear="handleClear"
-      @backspace="handleBackspace"
-      @calculate="handleCalculate"
-    />
-    <p class="calculator__hint" aria-hidden="true">
-      Press “=” or Enter to evaluate via the backend.
-    </p>
   </main>
 </template>

@@ -29,10 +29,11 @@ backend over HTTP using the native `fetch` API. Calculation logic,
 database operations, and persistence live exclusively in the
 backend repository.
 
-> Note: Frontend-backend HTTP integration for calculations is
-> **implemented** — the current code sends `POST /api/calculate` to
-> the backend and renders the returned result. History HTTP
-> integration (`GET /api/history`, `DELETE /api/history/{id}`) is
+> Note: Frontend-backend HTTP integration for calculations and
+> history retrieval is **implemented** — the current code sends
+> `POST /api/calculate` for evaluation and `GET /api/history` for
+> history. The backend / database is the source of truth for
+> history. History **deletion** (`DELETE /api/history/{id}`) is
 > **not yet implemented** — see *Current Implementation Status*
 > below.
 
@@ -86,14 +87,15 @@ phase.
 
 ## 6. Project Structure
 
-The current Phase 3 structure of this repository:
+The current Phase 4 structure of this repository:
 
 ```
 .
 ├── src/
 │   ├── components/
 │   │   ├── CalculatorDisplay.vue
-│   │   └── CalculatorKeypad.vue
+│   │   ├── CalculatorKeypad.vue
+│   │   └── HistoryList.vue
 │   ├── services/
 │   │   └── calculatorApi.js
 │   ├── App.vue
@@ -120,13 +122,19 @@ Notes:
   `clear`, `backspace`, `calculate`). It performs no string mutation
   or network logic itself. It accepts a `disabled` prop used while a
   calculation request is in flight.
+- `HistoryList.vue` is a presentational component that renders the
+  calculator history returned by the backend. It receives `history`,
+  `isLoading`, and `errorMessage` as props. It performs no network
+  requests and does not store history in any browser storage.
 - `src/services/calculatorApi.js` owns all HTTP communication with
-  the backend. It exposes `calculateExpression(expression)` and an
-  `ApiError` class. Components must not contain duplicated `fetch`
-  logic.
+  the backend. It exposes `calculateExpression(expression)`,
+  `getHistory()`, and an `ApiError` class. Components must not
+  contain duplicated `fetch` logic.
 - `App.vue` owns the calculator UI state (`expression`, `result`,
-  `errorMessage`, `isLoading`) and wires keypad / keyboard input to
-  that state.
+  `errorMessage`, `isLoading`) and the history state (`history`,
+  `isHistoryLoading`, `historyError`). It wires keypad / keyboard
+  input to the calculator state and orchestrates initial history
+  load plus history refresh after a successful calculation.
 
 ---
 
@@ -253,25 +261,36 @@ service returns the controlled error
 *"Calculator service URL is not configured. Set VITE_API_BASE_URL in
 a local .env file."* and no request is issued.
 
-The Phase 3 integration calls:
+The current Phase 4 integration calls:
 
-- `POST http://127.0.0.1:8000/api/calculate`
+- `POST http://127.0.0.1:8000/api/calculate` with a JSON body of
+  `{"expression": "<expression string>"}`. The backend's `result`
+  string is displayed verbatim on success.
+- `GET http://127.0.0.1:8000/api/history` once on initial page load
+  and again after every successful calculation. The response is
+  rendered newest-first in the history panel.
 
-with a JSON body of `{"expression": "<expression string>"}` and
-displays the backend's `result` string verbatim on success.
+When the backend is stopped or unreachable:
 
-When the backend is stopped or unreachable, the frontend shows the
-generic message *"Unable to connect to the calculator service."* and
-does **not** produce any local fallback result.
+- `POST /api/calculate` failures show the generic
+  *"Unable to connect to the calculator service."* message in the
+  calculator area, and no local fallback result is produced.
+- `GET /api/history` failures show *"Unable to load calculation
+  history."* (or the backend's safe `message` when available) in
+  the history panel. A previously rendered history list is
+  preserved during a refresh failure.
+
+LocalStorage, sessionStorage, and IndexedDB are not used. History
+shown in the UI always comes from `GET /api/history`.
 
 ---
 
 ## 13. Current Implementation Status
 
-This repository is currently at **Phase 3**: integration with the
-backend `POST /api/calculate` endpoint. The frontend constructs an
-expression, sends it to the backend, and displays the backend result
-or the backend's safe error message.
+This repository is currently at **Phase 4**: calculation requests
+via `POST /api/calculate` plus history retrieval and display via
+`GET /api/history`. The frontend does not persist history in the
+browser; the backend / database is authoritative.
 
 Implemented in Phase 1 (still present):
 
@@ -292,59 +311,72 @@ Implemented in Phase 2:
 - Calculator keypad containing digits `0`–`9`, decimal point,
   operators `+ - * /`, parentheses `( )`, `C` (clear), `⌫`
   (backspace), and `=`.
-- Expression string construction — pressing buttons or supported
-  keyboard keys appends the corresponding character to the
-  expression.
-- Clear (`C`) behavior — empties the expression.
-- Backspace (`⌫`) behavior — removes only the last character of the
-  expression (string operation only, no parsing).
-- Supported keyboard entry — `0`–`9`, `.`, `+`, `-`, `*`, `/`, `(`,
-  `)`, `Backspace`, `Delete` / `Escape`, and `Enter` / `=`.
-  Unsupported printable keys are ignored and do not modify the
-  expression.
-- Responsive calculator layout for desktop, tablet, and mobile
-  widths.
-- Accessible semantic markup, including visible focus states and
-  appropriate `aria-label`s on icon-like buttons.
+- Expression string construction, clear, backspace, supported
+  keyboard entry, responsive layout, and accessible markup.
 
 Implemented in Phase 3:
 
 - `src/services/calculatorApi.js` — backend HTTP client that owns
-  the `POST /api/calculate` request, base-URL normalization, JSON
-  parsing, and error mapping. Components do not contain duplicated
-  `fetch` logic.
-- Real `=` behavior — pressing `=` (button or `Enter`) sends the
-  current expression to the backend and renders the returned
-  result.
-- Backend result display — the calculator display shows the
-  backend's `result` string verbatim, prefixed with `=`.
+  the `POST /api/calculate` request and the existing error model.
+- Real `=` behavior — pressing `=` sends the current expression to
+  the backend and renders the returned `result` string verbatim.
 - Backend error display — division-by-zero, malformed expressions,
   and other backend `HTTP 400` / `HTTP 500` responses are shown as
   the backend's safe `message` text.
 - Connection-failure handling — when the backend is unreachable the
   frontend shows a generic "Unable to connect to the calculator
-  service." message and does not produce any local fallback result.
-- Loading state — while a request is in flight, the entire keypad
-  is disabled, the display shows "Calculating…", and keyboard
-  input that would mutate or resubmit is ignored.
-- Duplicate-request protection — a second `=` press while a
-  request is in flight is ignored.
-- Result-reset on edit — appending, backspacing, or clearing the
-  expression clears any previous result and error so stale values
-  from a previous expression do not linger.
-- `ApiError` exception type with `message` and `status` fields is
-  used for both HTTP and network errors.
+  service." message and never falls back to local evaluation.
+- Loading state — the keypad is disabled and the display shows
+  "Calculating…" while a `POST /api/calculate` request is in
+  flight, and a duplicate `=` press is ignored.
+- Result-reset on edit — editing the expression clears any previous
+  result and error.
+
+Implemented in Phase 4:
+
+- `getHistory()` exported from `src/services/calculatorApi.js` —
+  issues `GET /api/history`, validates the response, and returns
+  the array of records returned by the backend. The same `ApiError`
+  model is used; no separate `fetch` implementation exists outside
+  the service module.
+- `HistoryList.vue` — presentational history component. Receives
+  `history`, `isLoading`, and `errorMessage` as props. Renders
+  expression, result, and timestamp per record. Renders an empty
+  state when the backend returns an empty array and a controlled
+  error state when history retrieval fails. Does not perform
+  network requests.
+- Initial history load — `App.vue` calls `loadHistory()` once
+  inside the existing `onMounted` lifecycle hook alongside the
+  keyboard listener registration.
+- History refresh after a successful calculation — a `POST
+  /api/calculate` success is followed by `loadHistory()`. The
+  previously rendered history remains visible if the refresh fails;
+  the failure is reported in `historyError`, not in the calculation
+  error area, so a successful calculation is never reported as
+  failed because of a subsequent history refresh failure.
+- Newest-first rendering — the backend already returns records
+  newest-first; the frontend preserves that order without
+  resorting.
+- Date / time rendering — backend `created_at` values are
+  formatted with `new Date(value).toLocaleString()` for display.
+  The backend value is not altered. Because the backend timestamp
+  string is timezone-naive, the frontend does not invent
+  timezone semantics; it formats presentation only.
+- Database-backed persistence — the frontend reloads history from
+  `GET /api/history` on every page load and after every successful
+  calculation. LocalStorage, sessionStorage, and IndexedDB are not
+  used.
 
 The frontend still does not perform arithmetic locally. Every
 calculation result displayed in the UI comes from a successful
-response of `POST /api/calculate`.
+response of `POST /api/calculate`, and every rendered history
+record comes from `GET /api/history`.
 
 Not yet implemented (planned for later phases):
 
-- Integration with `GET /api/history`.
-- History display panel.
 - Integration with `DELETE /api/history/{id}`.
-- History deletion UI.
+- History deletion UI (delete buttons, confirmation dialogs,
+  optimistic deletion).
 - LocalStorage is still **not** used as a source of truth for any
   history data.
 
@@ -386,8 +418,20 @@ Expected results:
   - `1/0` → backend error displayed ("division by zero" or similar).
   - Malformed expressions that can be constructed through the UI
     (e.g. `1++*`, `((1+`) → backend error displayed.
+- History verification (Phase 4):
+  - On initial page load the frontend issues a `GET /api/history`
+    request and renders the records returned by the backend.
+  - After each successful `POST /api/calculate` the frontend issues
+    a fresh `GET /api/history`; the new record appears at the top
+    of the history panel.
+  - Refreshing the browser page re-runs `GET /api/history`; the
+    records persisted by the backend reload correctly.
+  - Restarting the frontend dev server does not affect persisted
+    history (the backend's MySQL store is authoritative).
 - Browser Network panel shows a real `POST http://127.0.0.1:8000/api/calculate`
-  request with a JSON body of `{"expression": "<expression>"}`.
+  request with a JSON body of `{"expression": "<expression>"}`,
+  followed by a real `GET http://127.0.0.1:8000/api/history`
+  request.
 - Manual UI / input verification:
   - Button input constructs the expression string.
   - Keyboard input (digits, operators, parentheses, decimal point)
@@ -401,7 +445,12 @@ Expected results:
 - Backend-offline verification (after stopping the backend):
   - Pressing `=` with `1+2` produces no `3`.
   - The generic "Unable to connect to the calculator service."
-    message is shown.
+    message is shown in the calculator area.
+  - The history panel shows "Unable to load calculation history."
+    or the backend's safe `message` on the initial load.
+  - A previously rendered history list stays visible during a
+    subsequent refresh failure — only the inline error notice
+    appears.
   - The application remains usable — the user can edit and clear
     the expression and retry once the backend is back.
 - The browser console reports no errors, no Vue warnings, and no
