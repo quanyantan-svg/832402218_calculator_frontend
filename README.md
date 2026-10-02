@@ -114,15 +114,18 @@ Notes:
 
 ## 7. Environment Requirements
 
-- **Node.js** — see `package.json` `engines` / your local
-  installation. (The local environment used to develop this Phase 1
-  repository was Node.js **v22.23.2**.)
-- **npm** — comes with Node.js. (The local environment used
-  **npm 10.9.8**.)
+- **Node.js**
+- **npm** (bundled with Node.js)
 
-These are the versions present in the development environment for
-this Phase 1 commit; no minimum version is enforced beyond what the
-official Vite + Vue 3 template requires.
+This Phase 1 repository was developed and verified locally with:
+
+- Node.js **v22.23.2**
+- npm **10.9.8**
+
+No `engines` field is declared in `package.json`; the repository does
+not enforce a specific Node.js or npm version. The versions above
+are reported because they are the versions actually used to build
+and run the Phase 1 commit.
 
 A running instance of the backend service (`832402218_calculator_backend`)
 is **not** required for Phase 1 development, because Phase 1 does
