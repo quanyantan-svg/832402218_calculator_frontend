@@ -29,11 +29,12 @@ backend over HTTP using the native `fetch` API. Calculation logic,
 database operations, and persistence live exclusively in the
 backend repository.
 
-> Note: Frontend-backend HTTP integration (calculation requests and
-> history) is **not yet implemented** in this repository — see
-> *Current Implementation Status* below. The current code implements
-> the calculator UI and expression input only; it does not yet call
-> any backend endpoint.
+> Note: Frontend-backend HTTP integration for calculations is
+> **implemented** — the current code sends `POST /api/calculate` to
+> the backend and renders the returned result. History HTTP
+> integration (`GET /api/history`, `DELETE /api/history/{id}`) is
+> **not yet implemented** — see *Current Implementation Status*
+> below.
 
 ---
 
@@ -75,7 +76,7 @@ The frontend never reimplements any of the above locally.
 - **Vite** (build tool and dev server)
 - **JavaScript** (ES modules)
 - **Plain CSS** (no CSS frameworks)
-- **fetch API** (planned for backend communication)
+- **fetch API** (backend HTTP communication)
 
 No TypeScript, no UI/CSS frameworks, no router, no state library,
 no HTTP client library, and no calculator library are used in this
@@ -145,8 +146,14 @@ are reported because they are the versions actually used to build
 and run the current commit.
 
 A running instance of the backend service (`832402218_calculator_backend`)
-is **not** required for current Phase 2 UI/input development, because
-no API calls are made yet. The calculator UI is fully usable offline.
+**is** required to actually evaluate expressions in the current
+Phase 3 application — every calculation result is produced by
+`POST /api/calculate`. Without the backend, the calculator UI
+itself still loads and the user can construct / edit / clear an
+expression, but pressing `=` does **not** produce a new valid
+calculation result (the frontend shows the generic
+*"Unable to connect to the calculator service."* message and never
+falls back to local evaluation).
 
 ---
 
