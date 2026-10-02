@@ -324,9 +324,13 @@ integrates calculation requests via `POST /api/calculate`, history
 retrieval and display via `GET /api/history`, and individual
 history record deletion via `DELETE /api/history/{id}`. The
 frontend does not persist history in the browser; the backend /
-database is authoritative. Deployment to a publicly reachable
-host is a separate later project step and is **not** part of this
-repository.
+database is authoritative.
+
+Production deployment is also complete. The public deployment is
+reachable at http://129.204.51.149:8082. Nginx serves the Vue
+production build as static files and reverse-proxies `/api/` and
+`/health` to the local FastAPI backend; the backend and database
+remain authoritative.
 
 Implemented in Phase 1 (still present):
 
@@ -515,11 +519,132 @@ Not implemented (and intentionally out of scope):
 - LocalStorage, sessionStorage, or IndexedDB usage for history
   state.
 - Frontend arithmetic / expression evaluation.
-- Public deployment / production hosting.
 
 ---
 
-## 14. Build Verification
+## 14. Production Deployment
+
+The frontend has been deployed to a public server and verified
+end-to-end against the deployed FastAPI backend and MySQL
+database. This section documents the live deployment only.
+Local-development documentation remains in the surrounding
+sections.
+
+### Public URL
+
+```
+http://129.204.51.149:8082
+```
+
+The public deployment was verified from an external browser.
+
+### Production Architecture
+
+Public traffic flow for the calculator UI:
+
+```
+Browser
+  → Nginx :8082
+  → Vue production static files (under /var/www/calculator)
+```
+
+Public traffic flow for backend API and health checks:
+
+```
+Browser
+  → http://129.204.51.149:8082/api/...   (or /health)
+  → Nginx :8082
+  → FastAPI on 127.0.0.1:8000
+  → MySQL on 127.0.0.1:3306
+```
+
+Nginx is the only public-facing web layer for this calculator
+deployment. The FastAPI backend is not exposed directly on a
+public port, and MySQL is not exposed publicly on port 3306.
+
+### Frontend Build
+
+The production frontend was built with:
+
+```bash
+VITE_API_BASE_URL=http://129.204.51.149:8082 npm run build
+```
+
+The production frontend must **not** use `http://127.0.0.1:8000`
+as its browser-visible API base URL: in a remote user's browser,
+`127.0.0.1` refers to that user's own machine, not to the
+production server. For local development `127.0.0.1` is correct
+because the browser runs on the same machine as the backend; for
+the deployed frontend the API base URL must point at the public
+Nginx endpoint.
+
+The resulting `dist/` files were copied to:
+
+```
+/var/www/calculator
+```
+
+which Nginx serves as the static frontend document root.
+
+### Nginx Routing
+
+Routing summary for the public deployment:
+
+```
+/          → Vue production static files (under /var/www/calculator)
+/api/      → http://127.0.0.1:8000
+/health    → http://127.0.0.1:8000/health
+```
+
+Nginx terminates public traffic on TCP port 8082 and reverse-proxies
+`/api/` and `/health` to the local FastAPI service. The FastAPI
+service itself listens only on the server's loopback interface.
+
+### Production Verification
+
+The following facts were verified against the live deployment:
+
+- The public page is reachable at http://129.204.51.149:8082.
+- Successful calculations work through the deployed frontend
+  (expressions are evaluated by the FastAPI backend).
+- Compound expressions work (operator precedence and parentheses).
+- The decimal result `0.1 + 0.2` resolves to `0.3`.
+- Calculation history loads from the backend / MySQL.
+- History record deletion works and the list refreshes from the
+  backend afterwards.
+- `/health` reports the production environment with the database
+  connected.
+- Server reboot was tested; the frontend, backend, and database
+  services recover and history data persisted across the reboot.
+- History remained persisted after restart (backend MySQL is
+  authoritative).
+
+The production deployment currently uses HTTP on port 8082.
+HTTPS has **not** been configured, so this README does not claim
+HTTPS.
+
+### Security
+
+Security posture of the deployed frontend and its supporting
+services:
+
+- The frontend contains no secrets. No database password, API
+  token, private key, or backend credential is bundled into the
+  Vue build or shipped to the browser.
+- `VITE_API_BASE_URL` is public configuration (the URL the browser
+  uses to reach the API). It is **not** a credential and exposing
+  it to browser code is by design.
+- The FastAPI backend listens only on the server's loopback
+  interface at `127.0.0.1:8000`. It is not bound to a public
+  interface.
+- MySQL listens locally and is not intentionally exposed publicly.
+- Production secrets (database credentials and any backend
+  configuration values that must remain private) remain in the
+  backend server's `.env` file and are **not** committed to Git.
+
+---
+
+## 15. Build Verification
 
 To verify that the frontend builds and runs locally:
 
