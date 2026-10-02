@@ -88,7 +88,7 @@ phase.
 
 ## 6. Project Structure
 
-The current Phase 5 structure of this repository:
+Current frontend structure:
 
 ```
 .
@@ -165,13 +165,12 @@ are reported because they are the versions actually used to build
 and run the current commit.
 
 A running instance of the backend service (`832402218_calculator_backend`)
-**is** required by the current Phase 5 application, both for
-evaluating expressions through `POST /api/calculate`, for
-retrieving calculation history through `GET /api/history`, and for
-deleting individual history records through
-`DELETE /api/history/{id}`. Without the backend, the calculator UI
-itself still loads and the user can still construct, edit, and
-clear an expression, but:
+**is** required by the current frontend, both for evaluating
+expressions through `POST /api/calculate`, for retrieving
+calculation history through `GET /api/history`, and for deleting
+individual history records through `DELETE /api/history/{id}`.
+Without the backend, the calculator UI itself still loads and the
+user can still construct, edit, and clear an expression, but:
 
 - pressing `=` does **not** produce a new valid calculation result
   (the frontend shows the generic *"Unable to connect to the
@@ -284,7 +283,7 @@ service returns the controlled error
 *"Calculator service URL is not configured. Set VITE_API_BASE_URL in
 a local .env file."* and no request is issued.
 
-The current Phase 5 integration calls:
+The current frontend calls:
 
 - `POST http://127.0.0.1:8000/api/calculate` with a JSON body of
   `{"expression": "<expression string>"}`. The backend's `result`
@@ -320,11 +319,14 @@ deletions are confirmed by the backend before the UI updates.
 
 ## 13. Current Implementation Status
 
-This repository is currently at **Phase 5**: calculation requests
-via `POST /api/calculate`, history retrieval and display via
-`GET /api/history`, and individual history record deletion via
-`DELETE /api/history/{id}`. The frontend does not persist history
-in the browser; the backend / database is authoritative.
+The core frontend implementation is complete. The frontend
+integrates calculation requests via `POST /api/calculate`, history
+retrieval and display via `GET /api/history`, and individual
+history record deletion via `DELETE /api/history/{id}`. The
+frontend does not persist history in the browser; the backend /
+database is authoritative. Deployment to a publicly reachable
+host is a separate later project step and is **not** part of this
+repository.
 
 Implemented in Phase 1 (still present):
 
@@ -455,13 +457,56 @@ Implemented in Phase 5:
   refresh, frontend dev-server restart, or backend process
   restart.
 
+Final polish / Phase 6:
+
+- Race hardening for `GET /api/history` — `App.vue` keeps a
+  monotonic `historyRequestSequence` counter. Every `loadHistory()`
+  call increments the counter, captures its own id, and only mutates
+  `history`, `historyError`, and `isHistoryLoading` when its id
+  still matches the counter after the request resolves. Older
+  in-flight `GET` responses are discarded silently. This guarantees:
+  - a slower older `GET` cannot overwrite the result of a newer
+    `GET`;
+  - an older `GET` that fails after a newer `GET` succeeds cannot
+    replace the successful state with an error;
+  - an older `GET` started before a deletion cannot restore the
+    deleted row after the post-delete `GET` has completed;
+  - `isHistoryLoading` is only cleared by the latest in-flight
+    request.
+- Responsive page layout — the `#app` container uses top-safe
+  vertical alignment (`align-items: flex-start`) with horizontal
+  centering preserved. On short viewports the page scrolls
+  vertically as expected and the calculator + history stay
+  reachable. The calculator card never becomes inaccessible above
+  the visible viewport. No horizontal page overflow is introduced.
+- History panel scrolling — the desktop history panel retains its
+  internal `overflow-y: auto` cap so very long lists do not push
+  the page taller than the viewport on tall desktop layouts; on
+  mobile the cap is removed and the page itself scrolls, avoiding
+  nested-scroll problems.
+- Accessibility review — every interactive control is a native
+  `<button type="button">` with a meaningful `aria-label`, a
+  visible `:focus-visible` ring, and a native `:disabled` state
+  during in-flight requests. The expression, result, loading,
+  error, history loading, history refresh error, and history delete
+  error regions use appropriate `role="alert"` / `aria-live`
+  semantics without redundant ARIA.
+- Source / security regression — final source search confirms
+  zero `eval` / `Function` / expression-parser / math-library
+  hits, zero `localStorage` / `sessionStorage` / `IndexedDB`
+  hits, and exactly three `fetch(` calls, all in
+  `src/services/calculatorApi.js` (POST calculate, GET history,
+  DELETE history).
+- No LocalStorage / sessionStorage / IndexedDB is used for
+  history or any other state. No `axios` dependency was added.
+
 The frontend still does not perform arithmetic locally. Every
 calculation result displayed in the UI comes from a successful
 response of `POST /api/calculate`, every rendered history record
 comes from `GET /api/history`, and every successful deletion is
 confirmed by the backend before the UI updates.
 
-Not implemented in Phase 5 (and intentionally out of scope):
+Not implemented (and intentionally out of scope):
 
 - Clear-all history.
 - Batch / multi-select deletion.
@@ -469,6 +514,8 @@ Not implemented in Phase 5 (and intentionally out of scope):
   confirmation.
 - LocalStorage, sessionStorage, or IndexedDB usage for history
   state.
+- Frontend arithmetic / expression evaluation.
+- Public deployment / production hosting.
 
 ---
 
@@ -508,7 +555,7 @@ Expected results:
   - `1/0` → backend error displayed ("division by zero" or similar).
   - Malformed expressions that can be constructed through the UI
     (e.g. `1++*`, `((1+`) → backend error displayed.
-- History verification (Phase 4):
+- History verification:
   - On initial page load the frontend issues a `GET /api/history`
     request and renders the records returned by the backend.
   - After each successful `POST /api/calculate` the frontend issues
@@ -518,7 +565,7 @@ Expected results:
     records persisted by the backend reload correctly.
   - Restarting the frontend dev server does not affect persisted
     history (the backend's MySQL store is authoritative).
-- Delete verification (Phase 5):
+- Delete verification:
   - Each visible history record shows a Delete button.
   - Clicking Delete sends `DELETE http://127.0.0.1:8000/api/history/{id}`
     with the id taken from the backend's `record.id`.

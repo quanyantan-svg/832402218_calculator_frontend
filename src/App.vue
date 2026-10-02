@@ -17,6 +17,15 @@ const historyError = ref('');
 const deletingHistoryId = ref(null);
 const deleteHistoryError = ref('');
 
+// Monotonic counter guarding overlapping GET /api/history requests.
+// Each loadHistory() invocation increments the counter and captures
+// its own id; only the response of the latest call is allowed to
+// mutate history / historyError / isHistoryLoading. Older responses
+// that resolve later are silently discarded, so an in-flight older
+// GET cannot overwrite a newer authoritative list (for example,
+// the list refreshed after a successful history deletion).
+let historyRequestSequence = 0;
+
 const allowedInputKeys = new Set([
   '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
   '.', '+', '-', '*', '/', '(', ')',
@@ -77,26 +86,37 @@ async function handleCalculate() {
   }
 
   if (calculated) {
-    // A history refresh failure must not overwrite a successful
-    // calculation result. Errors flow into historyError only.
     await loadHistory();
   }
 }
 
 async function loadHistory() {
+  const requestId = ++historyRequestSequence;
   isHistoryLoading.value = true;
+
   try {
     const items = await getHistory();
+
+    if (requestId !== historyRequestSequence) {
+      return;
+    }
+
     history.value = items;
     historyError.value = '';
   } catch (err) {
+    if (requestId !== historyRequestSequence) {
+      return;
+    }
+
     if (err instanceof ApiError) {
       historyError.value = err.message;
     } else {
       historyError.value = 'Unable to load calculation history.';
     }
   } finally {
-    isHistoryLoading.value = false;
+    if (requestId === historyRequestSequence) {
+      isHistoryLoading.value = false;
+    }
   }
 }
 
@@ -124,9 +144,6 @@ async function handleDeleteHistory(historyId) {
   }
 
   if (deleted) {
-    // Authoritative refresh: the rendered list after a successful
-    // delete must come from GET /api/history, not from a local
-    // filter, so the database ownership is observable.
     await loadHistory();
   }
 }
