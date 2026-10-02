@@ -154,14 +154,20 @@ are reported because they are the versions actually used to build
 and run the current commit.
 
 A running instance of the backend service (`832402218_calculator_backend`)
-**is** required to actually evaluate expressions in the current
-Phase 3 application — every calculation result is produced by
-`POST /api/calculate`. Without the backend, the calculator UI
-itself still loads and the user can construct / edit / clear an
-expression, but pressing `=` does **not** produce a new valid
-calculation result (the frontend shows the generic
-*"Unable to connect to the calculator service."* message and never
-falls back to local evaluation).
+**is** required by the current Phase 4 application, both for
+evaluating expressions through `POST /api/calculate` and for
+retrieving calculation history through `GET /api/history`. Without
+the backend, the calculator UI itself still loads and the user can
+still construct, edit, and clear an expression, but:
+
+- pressing `=` does **not** produce a new valid calculation result
+  (the frontend shows the generic *"Unable to connect to the
+  calculator service."* message and never falls back to local
+  evaluation);
+- calculation history cannot be retrieved or refreshed (the history
+  panel shows *"Unable to load calculation history."*);
+- no local fallback calculation is performed and no browser-stored
+  history (LocalStorage, sessionStorage, IndexedDB) is used.
 
 ---
 
