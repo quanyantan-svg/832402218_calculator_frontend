@@ -29,8 +29,11 @@ backend over HTTP using the native `fetch` API. Calculation logic,
 database operations, and persistence live exclusively in the
 backend repository.
 
-> Note: Frontend-backend integration is **not yet implemented** in
-> this Phase 1 repository. See *Current Implementation Status* below.
+> Note: Frontend-backend HTTP integration (calculation requests and
+> history) is **not yet implemented** in this repository — see
+> *Current Implementation Status* below. The current code implements
+> the calculator UI and expression input only; it does not yet call
+> any backend endpoint.
 
 ---
 
@@ -125,7 +128,7 @@ Notes:
 - **Node.js**
 - **npm** (bundled with Node.js)
 
-This Phase 1 repository was developed and verified locally with:
+This repository was developed and verified locally with:
 
 - Node.js **v22.23.2**
 - npm **10.9.8**
@@ -133,11 +136,11 @@ This Phase 1 repository was developed and verified locally with:
 No `engines` field is declared in `package.json`; the repository does
 not enforce a specific Node.js or npm version. The versions above
 are reported because they are the versions actually used to build
-and run the Phase 1 commit.
+and run the current commit.
 
 A running instance of the backend service (`832402218_calculator_backend`)
-is **not** required for Phase 1 development, because Phase 1 does
-not yet make any API calls.
+is **not** required for current Phase 2 UI/input development, because
+no API calls are made yet. The calculator UI is fully usable offline.
 
 ---
 
@@ -230,8 +233,10 @@ http://127.0.0.1:8000
 This corresponds to the default FastAPI development server in the
 backend repository.
 
-API integration is planned for a later frontend phase and is **not
-yet implemented** in this Phase 1 repository.
+API integration is planned for a later frontend phase (Phase 3) and
+is **not yet implemented** in this repository. The current code
+implements the calculator UI and expression input only; it does not
+yet call any backend endpoint.
 
 ---
 
@@ -306,21 +311,36 @@ npm run build
 npm run dev
 ```
 
-Expected results in Phase 1:
+Expected results:
 
 - `npm install` completes without errors.
 - `npm run build` produces a `dist/` directory and exits with
   status code `0`.
-- `npm run dev` starts the Vite dev server; the page loads and
-  displays the minimal Phase 1 shell:
-  - Title: `Calculator`
-  - Status text: `Frontend application initialized successfully.`
-- The browser console reports no errors related to missing assets
-  or failed module loads.
-- No API requests are made in Phase 1.
+- `npm run dev` starts the Vite dev server; the page loads and the
+  calculator application renders.
+- The calculator page is visible with:
+  - A title of `Calculator`.
+  - The expression display visible (showing `0` in the empty state).
+  - The keypad visible with digit, operator, parenthesis, decimal,
+    clear, backspace, and `=` buttons.
+- Manual UI / input verification:
+  - Button input constructs the expression string (e.g. pressing
+    `1 + 2` produces `1+2`; pressing `( 1 + 2 ) * 3` produces
+    `(1+2)*3`; pressing `0 . 5 + 2` produces `0.5+2`).
+  - Keyboard input (digits, operators, parentheses, decimal point)
+    constructs the expression string the same way.
+  - `C` clears the expression; the display returns to `0`.
+  - `Backspace` removes exactly one character from the expression.
+  - Pressing `=` does **not** calculate the expression locally and
+    does **not** modify the expression string.
+  - Pressing `=` makes **no** network request.
+- No API requests are issued in Phase 2. The browser's network
+  panel remains empty of frontend-originated traffic.
+- The browser console reports no errors, no Vue warnings, and no
+  missing-asset errors.
 
-No automated test framework has been added in Phase 1, so there are
-no `npm test` scripts at this time.
+No automated test framework has been added, so there are no `npm
+test` scripts at this time.
 
 ---
 
